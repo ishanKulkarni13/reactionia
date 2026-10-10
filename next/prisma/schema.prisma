@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  shortName String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  players Player[]
+}
+
+model Player {
+  id             String   @id @default(cuid())
+  publicUid      String   @unique
+  name           String
+  normalizedName String
+  mobileNumber   String?  @unique
+  departmentId   String
+  bestScore      Int      @default(0)
+  playCount      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  department Department @relation(fields: [departmentId], references: [id])
+  plays      Play[]
+
+  @@unique([normalizedName, departmentId])
+  @@index([departmentId])
+  @@index([bestScore])
+}
+
+model Play {
+  id        String   @id @default(cuid())
+  playerId  String
+  total     Int
+  reaction  Int
+  tapStorm  Int
+  clash     Int
+  createdAt DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId])
+  @@index([createdAt])
+}

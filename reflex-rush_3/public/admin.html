@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin | Reflex Rush</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=JetBrains+Mono:wght@700&display=swap">
+<link rel="stylesheet" href="/style.css"><style>.wrap{max-width:980px}td input,td select{margin:0;padding:8px;font-size:.9rem}td .main{width:auto;padding:7px 11px;font-size:.85rem;box-shadow:2px 2px 0 var(--ink)}.del{background:#fff;color:#c1121f}</style></head><body><div class="wrap">
+<header class="top"><div class="logo"><b>IEEE</b><span>Reflex Rush<small>Admin</small></span></div></header>
+<section class="card"><label for="pw">Admin password</label><input id="pw" type="password"><button class="main" id="go">Load scoreboard</button><p id="msg" class="err"></p></section>
+<section class="card hide" id="box"><div class="row" style="margin:0 0 12px"><button class="main alt sm" id="csv">Export CSV</button><button class="main del sm" id="wipe">Delete ALL records</button></div>
+<div style="overflow-x:auto"><table id="t"></table></div></section></div>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let D;const H=()=>({"Content-Type":"application/json","x-admin-password":$("#pw").value});
+async function load(){D=await (await fetch("/api/scores")).json();
+ const probe=await fetch("/api/admin",{method:"PATCH",headers:H()});
+ if(probe.status===401){$("#msg").textContent="Wrong password";return}
+ $("#msg").textContent="";$("#box").classList.remove("hide");
+ $("#t").innerHTML="<tr><th>Name</th><th>Department</th><th>Best</th><th>Plays</th><th></th></tr>"+D.players.map(p=>`<tr data-id="${esc(p.id)}">
+ <td><input value="${esc(p.name)}"></td><td><select>${D.branches.map(b=>`<option ${b===p.branch?"selected":""}>${esc(b)}</option>`).join("")}</select></td>
+ <td><input type="number" value="${p.best}" style="width:80px"></td><td>${p.plays}</td>
+ <td style="white-space:nowrap"><button class="main alt save">Save</button> <button class="main del rm">Delete</button></td></tr>`).join("")}
+async function call(m,u,b){const r=await fetch(u,{method:m,headers:H(),body:b&&JSON.stringify(b)});if(!r.ok)alert((await r.json()).error);load()}
+$("#go").onclick=load;
+$("#t").onclick=e=>{const tr=e.target.closest("tr[data-id]");if(!tr)return;const id=tr.dataset.id;
+ if(e.target.classList.contains("save"))call("PUT","/api/admin",{id,name:tr.querySelector("input").value,branch:tr.querySelector("select").value,best:tr.querySelector("input[type=number]").value});
+ if(e.target.classList.contains("rm")&&confirm("Delete this record?"))call("DELETE","/api/admin?id="+encodeURIComponent(id))};
+$("#wipe").onclick=()=>{if(confirm("Delete EVERY record?"))call("DELETE","/api/admin?all=1")};
+$("#csv").onclick=()=>{const q=v=>`"${String(v).replace(/"/g,'""')}"`;const rows=[["Name","Department","Best","Plays"],...D.players.map(p=>[p.name,p.branch,p.best,p.plays])];
+ const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(q).join(",")).join("\n")],{type:"text/csv"}));a.download="reflex-rush-scores.csv";a.click()};
+</script></body></html>

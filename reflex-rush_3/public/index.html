@@ -1,0 +1,127 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reflex Rush | IEEE VIT Pune</title>
+<meta name="theme-color" content="#00629b">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=JetBrains+Mono:wght@700&display=swap">
+<link rel="stylesheet" href="/style.css"></head><body><div class="band"><div id="band"></div></div><div class="wrap">
+<header class="top"><div class="logo"><b>IEEE</b><span>VIT Pune<small>Student Branch</small></span></div><span class="live">LIVE BOARD</span></header>
+
+<main class="layout" id="layout"><div id="left"><section id="reg">
+  <h1>How fast are <em>you?</em></h1>
+  <p class="lead">Three reflex rounds. Under a minute. Every point you score goes to your department.</p>
+  <div class="card"><span class="sticker">FREE TO PLAY</span>
+    <label for="name">Your name</label><input id="name" placeholder="e.g. Aditi Kulkarni" maxlength="30" autocomplete="name">
+    <label for="branch">Your department</label><select id="branch"></select>
+    <button class="main" id="start">Start the rush</button><p id="msg" class="err"></p>
+  </div>
+</section>
+
+<section id="game" class="hide"><div id="hud"><span id="rl"></span><span class="pips"><i></i><i></i><i></i></span></div><div id="stage" class="stage"></div></section>
+
+<section id="end" class="hide">
+  <div class="card" style="text-align:center"><h2 id="endname"></h2><div class="score" id="final"></div><span class="title" id="ttl"></span>
+    <div class="parts" id="parts"></div><p id="rank"></p>
+    <button class="main" id="next">Next player</button><button class="main alt" id="share" style="margin-top:12px">Challenge friends</button></div>
+  <div class="card cta"><h2 id="evn"></h2><p id="evd"></p><a id="evl" class="hide"><button class="main">Know more</button></a><p id="evh" style="margin:0;font-weight:600">Visit the IEEE VIT Pune desk to join in.</p></div>
+</section>
+
+</div><div id="boards">
+  <section class="card"><h2>Department leaderboard</h2><p class="hint" id="stat">Every player's best score counts toward their department.</p><ol id="bt"></ol></section>
+  <section class="card"><h2>Top players</h2><p class="hint">The fastest hands on campus.</p><ol id="pt"></ol></section>
+</div></main>
+<footer>Made with reflexes by <b>IEEE VIT Pune</b> Student Branch</footer>
+</div>
+<script>
+// ---- EDIT THIS: your event details (shown after the game) ----
+const EVENT={name:"Your Event Name",desc:"Date, venue and one line that makes students want to come.",link:""};
+// --------------------------------------------------------------
+const $=s=>document.querySelector(s),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),buzz=()=>navigator.vibrate&&navigator.vibrate(15);
+const stage=$("#stage"),rl=$("#rl");let me={},last=0;
+const SHORT={"Computer Engineering (CE)":"Computer Engg (CE)","Computer Engineering (Software Engineering)":"CE (Software Engg)","Information Technology (IT)":"IT","Computer Science & Engineering (Artificial Intelligence)":"CSE (AI)","Computer Science & Engineering (Artificial Intelligence & Machine Learning)":"CSE (AI & ML)","Computer Science & Engineering (Data Science)":"CSE (Data Science)","Computer Science & Engineering (IoT & Cyber Security including Blockchain Technology)":"CSE (IoT & Cyber Security)","Artificial Intelligence & Data Science (AI&DS)":"AI & DS","Electronics & Telecommunication Engineering (E&TC)":"E&TC","Instrumentation & Control Engineering":"Instrumentation & Control","Mechanical Engineering":"Mechanical","Civil Engineering":"Civil"};
+const S=f=>SHORT[f]||f;
+$("#band").textContent=Array(12).fill("IEEE VIT PUNE  *  REFLEX RUSH  *  REPRESENT YOUR DEPARTMENT  *").join("  ");
+$("#evn").textContent=EVENT.name;$("#evd").textContent=EVENT.desc;
+if(EVENT.link){$("#evl").href=EVENT.link;$("#evl").classList.remove("hide");$("#evh").classList.add("hide")}
+
+async function board(){
+  try{
+    const d=await (await fetch("/api/scores")).json();
+    if(!$("#branch").options.length)$("#branch").innerHTML='<option value="">Choose your department</option>'+d.branches.map(b=>`<option>${esc(b)}</option>`).join("");
+    const mx=Math.max(1,...d.summary.map(b=>b.total));
+    $("#bt").innerHTML=d.summary.map((b,i)=>`<li class="${b.branch===me.branch?"me":""}"><span class="rk r${i+1}">${i+1}</span><div class="nm"><b>${esc(S(b.branch))}</b>${S(b.branch)!==b.branch?`<span class="full">${esc(b.branch)}</span>`:""}<div class="bar"><i style="width:${b.total/mx*100}%"></i></div><small>${b.players?`${b.players} player${b.players>1?"s":""}, avg ${b.avg}`:"No players yet"}</small></div><span class="pt">${b.total}<small>PTS</small></span></li>`).join("");
+    $("#pt").innerHTML=d.players.slice(0,10).map((p,i)=>`<li><span class="rk r${i+1}">${i+1}</span><div class="nm"><b>${esc(p.name)}</b><small>${esc(S(p.branch))}</small></div><span class="pt">${p.best}<small>PTS</small></span></li>`).join("")||"<li>Be the first on the board.</li>";
+    $("#stat").textContent=`${d.players.length} players so far. Each player's best score counts for their department.`;
+    return d;
+  }catch(e){return null}
+}
+function pips(n){document.querySelectorAll(".pips i").forEach((e,i)=>e.classList.toggle("on",i<n))}
+function intro(t,d,n){stage.onpointerdown=null;pips(n);rl.textContent=`ROUND ${n} / 3`;stage.className="stage intro";
+  stage.innerHTML=`<div class="ib"><div class="rn">ROUND ${n}</div><h3>${t}</h3><p>${d}</p><button class="main" id="ok">Got it, I'm ready</button></div>`;
+  return new Promise(r=>{$("#ok").onclick=()=>r()})}
+
+async function reaction(){
+  let pts=0;
+  for(let i=1;i<=2;i++){
+    rl.textContent=`REACTION ${i}/2`;stage.className="stage wait";stage.textContent="Wait for green...";
+    const ms=await new Promise(res=>{let ready=false,t0=0;
+      const to=setTimeout(()=>{ready=true;t0=performance.now();stage.className="stage go";stage.textContent="TAP!"},1000+Math.random()*1500);
+      stage.onpointerdown=()=>{clearTimeout(to);res(ready?performance.now()-t0:null)}});
+    stage.onpointerdown=null;buzz();stage.className="stage res";
+    if(ms===null)stage.textContent="Too early! +0";
+    else{const p=clamp(Math.round((550-ms)/7),0,50);pts+=p;stage.innerHTML=`${Math.round(ms)} ms<br><small>+${p} pts</small>`}
+    await sleep(1000);
+  }return pts;
+}
+async function storm(){
+  stage.className="stage arena";stage.innerHTML="";const t0=performance.now();
+  for(let i=1;i<=10;i++){rl.textContent=`TAP STORM ${i}/10`;
+    await new Promise(res=>{const b=document.createElement("button");b.className="dot";b.setAttribute("aria-label","tap");
+      b.style.left=8+Math.random()*76+"%";b.style.top=8+Math.random()*76+"%";
+      b.onpointerdown=()=>{buzz();b.remove();res()};stage.appendChild(b)})}
+  return clamp(Math.round(100-((performance.now()-t0)/1000-5)*12),0,100);
+}
+function clash(){
+  const C={Red:"#e63946",Blue:"#1d4ed8",Green:"#16a34a",Purple:"#7c3aed"},N=Object.keys(C),R=()=>N[Math.floor(Math.random()*4)];
+  stage.className="stage clash";stage.innerHTML='<div id="word"></div><div id="opts"></div>';
+  let pts=0,cur;const end=performance.now()+12000;
+  const next=()=>{cur=R();$("#word").textContent=R();$("#word").style.color=C[cur]};
+  $("#opts").innerHTML=N.map(n=>`<button>${n}</button>`).join("");
+  document.querySelectorAll("#opts button").forEach(b=>b.onpointerdown=()=>{buzz();pts+=b.textContent===cur?10:-5;next()});
+  next();
+  return new Promise(res=>{const iv=setInterval(()=>{const l=end-performance.now();rl.textContent=`COLOUR CLASH ${Math.max(0,Math.ceil(l/1000))}s`;
+    if(l<=0){clearInterval(iv);res(clamp(pts,0,100))}},100)});
+}
+async function play(){
+  clearInterval(tmr);$("#layout").classList.add("solo");["#reg","#end","#boards"].forEach(s=>$(s).classList.add("hide"));$("#game").classList.remove("hide");scrollTo(0,0);
+  await intro("Reaction","The screen starts red. The moment it turns green, tap anywhere as fast as you can. Tap too early and that try scores 0. You get 2 tries.",1);const a=await reaction();
+  await intro("Tap Storm","10 dots pop up one at a time. Tap each one as fast as you can. The quicker you finish, the more points you get.",2);const b=await storm();
+  await intro("Colour Clash","A colour word appears in a different ink. Tap the button for the ink colour you SEE, not what the word says. 12 seconds. +10 right, -5 wrong.",3);const c=await clash();
+  const t=a+b+c;last=t;
+  $("#game").classList.add("hide");$("#end").classList.remove("hide");$("#boards").classList.remove("hide");$("#layout").classList.remove("solo");scrollTo(0,0);startReset();
+  $("#endname").textContent=`Nice run, ${me.name}!`;$("#final").textContent=t;
+  $("#ttl").textContent=t>=240?"Lightning Reflexes":t>=180?"Sharp Shooter":t>=110?"Quick Hands":"Warming Up";
+  $("#parts").innerHTML=`<div><b>${a}</b>Reaction</div><div><b>${b}</b>Tap Storm</div><div><b>${c}</b>Colour Clash</div>`;$("#rank").textContent="";
+  try{await fetch("/api/scores",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...me,score:t})})}catch(e){}
+  const d=await board();
+  if(d){const i=d.summary.findIndex(x=>x.branch===me.branch)+1,id=`${me.name}|${me.branch}`.toLowerCase(),r=d.players.findIndex(p=>p.id===id)+1;
+    $("#rank").textContent=`You're #${r||"-"} overall. ${me.branch} is #${i} of ${d.summary.length}.`}
+}
+$("#start").onclick=()=>{
+  me={name:$("#name").value.trim(),branch:$("#branch").value};
+  if(!me.name||!me.branch){$("#msg").textContent="Add your name and choose your department.";return}
+  $("#msg").textContent="";play();
+};
+let tmr,cd=30;
+function startReset(){cd=30;clearInterval(tmr);$("#next").textContent=`Next player (${cd})`;tmr=setInterval(()=>{cd--;$("#next").textContent=`Next player (${cd})`;if(cd<=0)reset()},1000)}
+function reset(){clearInterval(tmr);me={};last=0;$("#name").value="";$("#branch").value="";$("#msg").textContent="";$("#share").textContent="Challenge friends";
+  ["#game","#end"].forEach(x=>$(x).classList.add("hide"));$("#reg").classList.remove("hide");$("#boards").classList.remove("hide");$("#layout").classList.remove("solo");scrollTo(0,0);board();
+  if(matchMedia("(pointer:fine)").matches)$("#name").focus()}
+$("#next").onclick=reset;
+["pointerdown","scroll","keydown"].forEach(e=>addEventListener(e,()=>{cd=30},{passive:true}));
+$("#share").onclick=async()=>{const text=`I scored ${last} for ${me.branch} on Reflex Rush by IEEE VIT Pune. Beat me!`;
+  try{if(navigator.share)await navigator.share({title:"Reflex Rush",text,url:location.href});else{await navigator.clipboard.writeText(text+" "+location.href);$("#share").textContent="Copied!"}}catch(e){}};
+board();
+setInterval(()=>{if(!$("#boards").classList.contains("hide"))board()},10000);
+</script></body></html>
